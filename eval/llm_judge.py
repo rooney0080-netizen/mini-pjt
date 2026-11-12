@@ -7,7 +7,7 @@ import json
 
 from pydantic import BaseModel, Field
 
-from src.config import make_llm
+from src.shared.config import make_llm
 
 
 class JudgeResult(BaseModel):

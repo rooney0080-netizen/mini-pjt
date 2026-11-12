@@ -1,4 +1,4 @@
-"""db.py - SQLite 접속·해시 유틸 (MCP 서버와 평가 러너 공용)"""
+"""shared/db.py - SQLite 접속·해시 유틸 (MCP 서버와 평가 러너 공용)"""
 import hashlib
 import os
 import sqlite3

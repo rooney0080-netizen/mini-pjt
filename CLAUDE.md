@@ -96,7 +96,7 @@ AI 에이전트 개발 교육(Day1~7) 미니프로젝트 과제. 이 파일은 �
 
 ### 7.1 버전 공통 인터페이스 (평가 러너가 의존 — v2도 반드시 지킬 것)
 
-`eval/run_eval.py`가 `src.v1_agent` / `src.graph` 모듈에서 아래 두 함수를 가져다 쓴다.
+`eval/run_eval.py`가 `src.baseline.agent`(v1) / `src.workflows.sr_graph`(v2) 모듈에서 아래 두 함수를 가져다 쓴다.
 
 ```python
 def make_tracer(path) -> FileTracer          # v1: mask=False, v2: mask=True
@@ -109,7 +109,7 @@ async def run_request(request, *, db_path, history_path, approval_fn, callbacks)
 - 실행 도구 이름은 `execute_sql`(v1) / `execute_change`(v2) — 러너가 이 이름으로 실행 호출 수를 센다
 - 이력 Store: `SqliteStore` at `history_path`, namespace `("sr_history", table, pk)`, key `f"{column}@{iso}"`, value `{column, old, new, reason, at}` (F10 시드도 같은 형식)
 - 케이스 산출물: `eval/runs/<version>/<case>/{ops.db, history.sqlite, trace.jsonl}` (gitignore)
-- MCP 세션은 `src/runtime.py: mcp_tools(db_path)`로 연다 (`get_tools()`는 호출마다 프로세스를 띄워 느림)
+- MCP 세션은 `src/tools/client.py: mcp_tools(db_path)`로 연다 (`get_tools()`는 호출마다 프로세스를 띄워 느림)
 
 ## 8. 기술 스택 / 환경
 
@@ -125,7 +125,7 @@ async def run_request(request, *, db_path, history_path, approval_fn, callbacks)
 | 단계 | 산출물 |
 |---|---|
 | P0 준비 | venv, `data/make_db.py`, `eval/inout_set.json`, SERVICE.md 골격 |
-| P1 v1 | MCP 서버 2개, `src/v1_agent.py`, `eval/run_eval.py` → `results_v1.json` |
+| P1 v1 | MCP 서버 2개, `src/baseline/agent.py`, `eval/run_eval.py` → `results_v1.json` |
 | P2 v2 | schemas → guards → agents → graph(HITL·Store) → 미들웨어·tracer |
 | P3 | `results_v2.json`, LLM-Judge, SERVICE.md 비교·실패 분석 |
 
@@ -148,22 +148,70 @@ async def run_request(request, *, db_path, history_path, approval_fn, callbacks)
 | Trace | `day7_practice/local_tracer.py` (`FileTracer` 콜백) |
 | 평가 러너 / LLM-Judge | `day7_practice/run_eval.py` (`ToolRecorder`), `day7_practice/llm_judge.py` (`JudgeResult`) |
 
-## 11. 폴더 구조
+## 11. 폴더 구조 (도메인별, 2026-11-12 리팩토링)
 
 ```
 mini-prj/
-├─ CLAUDE.md / SERVICE.md / requirements.txt / main.py
-├─ data/make_db.py      # 샘플 운영 DB 생성 (결정적) → data/ops_init.db
+├─ CLAUDE.md / SERVICE.md / requirements.txt / main.py   # main.py = CLI 진입점
+├─ data/make_db.py            # 샘플 운영 DB 생성 (결정적) → data/ops_init.db
 ├─ src/
-│  ├─ config.py         # 경로, 모델, 화이트리스트, 한도
-│  ├─ mcp_readonly.py   # ops-readonly MCP 서버
-│  ├─ mcp_exec.py       # ops-exec MCP 서버 (dry_run, execute)
-│  ├─ v1_agent.py       # 기준선
-│  ├─ schemas.py / guards.py / agents.py / graph.py / middleware.py / tracer.py
+│  ├─ workflows/              # v2 SR 처리 그래프 (노드 연결·상태 전이만)
+│  │  ├─ sr_graph.py          #   build_graph, make_tracer, run_request  ← v2 공통 인터페이스
+│  │  └─ schemas.py           #   ChangeItem, ChangePlan, SRState, BLOCKING
+│  ├─ intake/                 # 요청 접수: 입력 가드 → Planner
+│  │  ├─ input_guard.py       #   check_input (정규식 규칙)
+│  │  ├─ planner.py           #   make_planner (LCEL + 구조화 출력)
+│  │  ├─ prompts.py           #   PLANNER_PROMPT
+│  │  └─ schemas.py           #   ChangeRequest, ParsedSR
+│  ├─ policy/                 # 변경 정책 (코드 강제)
+│  │  ├─ rules.py             #   PK, WRITABLE, WRITABLE_DESC, MAX_AFFECTED
+│  │  ├─ precheck.py          #   작업 종류·화이트리스트·허용 코드값 사전검사
+│  │  └─ sql_guard.py         #   check_sql (sqlglot), sql_literal, set_values
+│  ├─ drafting/               # 대상 분석·SQL 작성·검토 (Supervisor + 3 Agent)
+│  │  ├─ supervisor.py        #   build_change_supervisor, supervisor_input
+│  │  ├─ submit_tools.py      #   submit_targets / submit_sql / get_review_packet / submit_review
+│  │  └─ prompts.py           #   ANALYST / SQL / REVIEWER / SUPERVISOR 프롬프트
+│  ├─ execution/              # 검증·실행 (ops-exec 호출은 여기서만)
+│  │  ├─ dry_run_gate.py      #   rollback_statements, verify_with_dry_run
+│  │  └─ executor.py          #   execute_items (실행·사후 검증·부분 실행분 원복)
+│  ├─ history/store.py        # 변경 이력 Store: HISTORY_NS, history_warnings, record_changes
+│  ├─ reporting/templates.py  # 승인 카드·리포트 고정 문구, guard_output(출력 가드)
+│  ├─ tools/                  # MCP 도구 계층
+│  │  ├─ ops_readonly_server.py  # ops-readonly MCP 서버 (describe_table, query_readonly, count_affected)
+│  │  ├─ ops_exec_server.py      # ops-exec MCP 서버 (execute_sql[v1], dry_run, execute_change)
+│  │  └─ client.py               # mcp_tools(db_path): 세션 유지형 도구 로더
+│  ├─ baseline/               # v1 기준선 (단일 ReAct, 프롬프트 규칙만)
+│  │  ├─ agent.py             #   make_tracer, run_request  ← v1 공통 인터페이스
+│  │  └─ prompts.py           #   SYSTEM_PROMPT
+│  └─ shared/                 # 여러 도메인이 함께 쓰는 것만
+│     ├─ config.py            #   경로, MODEL_ID/REGION, make_llm()
+│     ├─ middleware.py        #   하위 Agent 공통 미들웨어 (재시도, 도구 결과 PII 마스킹)
+│     ├─ tracer.py            #   FileTracer (JSONL trace)
+│     ├─ messages.py          #   get_text, tool_output_text
+│     ├─ pii.py / db.py       #   PII 마스킹, SQLite 연결·해시
 ├─ eval/
 │  ├─ inout_set.json / run_eval.py / llm_judge.py
 │  └─ results_v1.json / results_v2.json
 ```
+
+### 11.1 파일 배치 규칙
+
+1. **모든 에이전트 코드는 `src/` 아래에 둔다.** 루트에는 진입점(`main.py`)만, 평가는 `eval/`, 데이터 생성은 `data/`에 둔다.
+2. **폴더는 기술 역할이 아니라 SR 처리 도메인 단위로 나눈다.** 처리 순서: `intake` → `policy` → `drafting` → `execution` → `history` → `reporting`. 이 순서를 `workflows`가 연결한다. `utils/`, `models/`, `prompts/` 같은 기술 역할 폴더는 만들지 않는다.
+3. **도메인 폴더 안에는 그 도메인의 실행 로직, 프롬프트(`prompts.py`), 입출력 스키마(`schemas.py`)를 함께 둔다.** 새 Agent나 단계가 생기면 해당 도메인 폴더에 로직, 프롬프트, 스키마를 같이 추가한다.
+4. **`shared/`에는 두 개 이상 도메인이 공통으로 쓰고 도메인 지식이 없는 것만 둔다.** 해당하는 것은 LLM 클라이언트, 미들웨어, tracer, 텍스트·PII·DB 유틸이다. 정책 상수(화이트리스트·한도)는 `policy/rules.py`, 이력 네임스페이스는 `history/store.py`에 둔다(도메인 지식이므로 shared가 아니다).
+5. **의존 방향**:
+   - `workflows` → 각 도메인 → `policy` / `tools` / `shared`
+   - `shared`는 다른 `src` 패키지를 import하지 않는다.
+   - 도메인끼리는 스키마(`intake.schemas`, `workflows.schemas`)와 `policy`만 참조한다.
+   - `workflows/schemas.py`는 `intake.schemas`만 import한다(순환 방지).
+   - 패키지 `__init__.py`는 비워 둔다.
+6. **안전 경계 (§3)**:
+   - `ops-exec` 도구(`dry_run`, `execute_change`)는 `execution/`에서만 호출한다.
+   - `drafting/`의 Agent에는 `ops-readonly` 도구와 제출 도구만 준다.
+   - `baseline/`(v1)만 예외로 `execute_sql`을 LLM에 바인딩한다.
+7. **MCP 서버 파일**(`tools/*_server.py`)은 자식 프로세스로 실행된다. 맨 위에서 `sys.path`에 프로젝트 루트(`parents[2]`)를 넣으므로, 이 파일을 옮기면 그 깊이도 함께 고친다. `shared/config.py`의 `ROOT`도 같다.
+8. **공통 인터페이스(§7.1) 모듈 경로**: v1은 `src.baseline.agent`, v2는 `src.workflows.sr_graph`이다. 이 경로를 바꾸면 `eval/run_eval.py`의 `VERSIONS`와 `main.py`도 함께 고친다.
 
 ## 12. 진행 체크리스트
 
@@ -173,7 +221,7 @@ mini-prj/
 - [x] `eval/inout_set.json` — 케이스 19개 + 전역 검사 G08 (기대 diff를 초기 DB와 대조 완료)
 - [x] `SERVICE.md` 골격 (§6 결과·실패 분석은 TODO)
 - [x] P1: MCP 서버 2개 + v1 + run_eval → `results_v1.json` (15/20)
-- [x] P2: v2 구현 (`src/graph.py`, `agents.py`, `guards.py`, `middleware.py`, `schemas.py`) + `main.py`
+- [x] P2: v2 구현 (`src/workflows/`, `drafting/`, `policy/`, `intake/` 등) + `main.py`
 - [x] P3: `results_v2.json` (20/20, Judge 5.0) + ablation + SERVICE.md §6 비교·실패 분석
 - [ ] `main.py` CLI 실제 실행 확인 — 2026-11-12 Bedrock **일일 토큰 한도 소진**으로 미확인. 한도 복구 후 `--reset`으로 F01 요청 1건 시연 확인 필요
 - [ ] (선택) ablation G03·G09 재실행 — 실행 B가 토큰 한도 오류로 미완

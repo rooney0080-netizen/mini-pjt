@@ -36,11 +36,12 @@ sys.path.insert(0, str(ROOT))
 
 from langchain_core.callbacks import BaseCallbackHandler  # noqa: E402
 
-from src.config import HISTORY_NS, INIT_DB, LOG_DIR  # noqa: E402
-from src.db import data_hash, schema_hash  # noqa: E402
+from src.history.store import HISTORY_NS  # noqa: E402
+from src.shared.config import INIT_DB, LOG_DIR  # noqa: E402
+from src.shared.db import data_hash, schema_hash  # noqa: E402
 
 EVAL_DIR = ROOT / "eval"
-VERSIONS = {"v1": "src.v1_agent", "v2": "src.graph"}
+VERSIONS = {"v1": "src.baseline.agent", "v2": "src.workflows.sr_graph"}
 EXEC_TOOLS = {"execute_sql", "execute_change"}
 
 

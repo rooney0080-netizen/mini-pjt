@@ -1,4 +1,4 @@
-"""tracer.py - LLM·도구 호출을 JSONL로 기록하는 콜백 (교육 실습 local_tracer.py 기반)
+"""shared/tracer.py - LLM·도구 호출을 JSONL로 기록하는 콜백 (교육 실습 local_tracer.py 기반)
 
 mask=True 이면 기록 직전에 전화번호·이메일을 마스킹한다 (v2). v1 기준선은 mask=False.
 """
@@ -9,8 +9,8 @@ from pathlib import Path
 
 from langchain_core.callbacks import BaseCallbackHandler
 
-from src.pii import mask_obj
-from src.runtime import get_text
+from src.shared.pii import mask_obj
+from src.shared.messages import get_text
 
 
 class FileTracer(BaseCallbackHandler):

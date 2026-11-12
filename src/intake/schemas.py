@@ -1,4 +1,4 @@
-"""schemas.py - 요청 파싱(ChangeRequest)과 처리 결과(ChangePlan) Pydantic 모델"""
+"""intake/schemas.py - 요청 파싱 결과 Pydantic 모델 (Planner 구조화 출력)"""
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -20,31 +20,3 @@ class ChangeRequest(BaseModel):
 class ParsedSR(BaseModel):
     """SR 1건을 하위 변경 목록으로 분해한 계획 (Plan-Execute의 Plan)"""
     changes: list[ChangeRequest] = Field(description="요청에 들어 있는 변경 작업 목록 (요청 순서대로)")
-
-
-ItemStatus = Literal["ready", "blocked", "not_found", "ambiguous", "over_limit", "no_change", "executed", "failed"]
-
-
-class ChangeItem(BaseModel):
-    """하위 변경 1건의 처리 상태"""
-    index: int
-    request: ChangeRequest
-    status: ItemStatus = "blocked"
-    message: str = ""
-    where_clause: str = ""
-    snapshot: list[dict] = Field(default_factory=list, description="변경 대상 행의 변경 전 값 [{pk, old}]")
-    candidates: list[str] = Field(default_factory=list)
-    sql: str = ""
-    rollback_statements: list[str] = Field(default_factory=list)
-    dry_run: dict = Field(default_factory=dict)
-    review: str = ""
-    warnings: list[str] = Field(default_factory=list)
-    exec_result: dict = Field(default_factory=dict)
-
-
-class ChangePlan(BaseModel):
-    """SR 처리 최종 결과 (리포트의 원천 데이터)"""
-    request: str
-    status: Literal["executed", "rejected", "blocked", "no_change", "failed"]
-    items: list[ChangeItem] = Field(default_factory=list)
-    report: str = ""

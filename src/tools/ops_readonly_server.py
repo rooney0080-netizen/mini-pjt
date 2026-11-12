@@ -1,4 +1,4 @@
-"""mcp_readonly.py - 운영 DB 조회 전용 MCP 서버 (ops-readonly)
+"""tools/ops_readonly_server.py - 운영 DB 조회 전용 MCP 서버 (ops-readonly)
 
 노출 도구 (모두 읽기 전용 연결 mode=ro 사용 -> 어떤 SQL이 와도 DB 변경 불가)
   - describe_table(table)            컬럼, PK, 허용 코드값
@@ -6,17 +6,17 @@
   - count_affected(table, where)     WHERE 조건에 해당하는 행 수
 
 DB 경로는 클라이언트가 환경변수 OPS_DB_PATH 로 넘긴다.
-실행: python src/mcp_readonly.py (stdio, 클라이언트가 자식 프로세스로 띄움)
+실행: python src/tools/ops_readonly_server.py (stdio, 클라이언트가 자식 프로세스로 띄움)
 """
 import json
 import sqlite3
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from fastmcp import FastMCP  # noqa: E402
 
-from src.db import connect_ro, db_path_from_env  # noqa: E402
+from src.shared.db import connect_ro, db_path_from_env  # noqa: E402
 
 mcp = FastMCP("ops-readonly")
 MAX_ROWS = 50

@@ -1,4 +1,4 @@
-"""middleware.py - 하위 Agent 공통 미들웨어
+"""shared/middleware.py - 하위 Agent 공통 미들웨어
 
 - ModelRetryMiddleware (langchain 내장): Bedrock 스로틀링 등 일시 오류 시 지수 백오프 재시도
 - PIIMaskToolResults (직접 구현): 도구 결과가 LLM에 들어가기 전에 전화번호·이메일 마스킹
@@ -8,8 +8,8 @@
 from langchain.agents.middleware import AgentMiddleware, ModelRetryMiddleware
 from langchain_core.messages import ToolMessage
 
-from src.pii import mask_pii
-from src.runtime import tool_output_text
+from src.shared.pii import mask_pii
+from src.shared.messages import tool_output_text
 
 DATA_TOOLS = {"query_readonly"}
 

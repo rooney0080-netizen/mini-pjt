@@ -1,4 +1,4 @@
-"""runtime.py - MCP 세션 연결, 메시지 텍스트 추출 등 v1/v2 공용 런타임 유틸"""
+"""tools/client.py - ops-readonly / ops-exec MCP 서버에 세션을 열고 도구를 로드한다 (v1·v2 공용)"""
 import os
 import sys
 from contextlib import AsyncExitStack, asynccontextmanager
@@ -7,28 +7,11 @@ from pathlib import Path
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_mcp_adapters.tools import load_mcp_tools
 
-SRC = Path(__file__).resolve().parent
+HERE = Path(__file__).resolve().parent
 SERVERS = {
-    "ops-readonly": SRC / "mcp_readonly.py",
-    "ops-exec": SRC / "mcp_exec.py",
+    "ops-readonly": HERE / "ops_readonly_server.py",
+    "ops-exec": HERE / "ops_exec_server.py",
 }
-
-
-def get_text(message) -> str:
-    """ChatBedrockConverse는 content를 블록 리스트로 주기도 하므로 텍스트만 모아 반환한다."""
-    content = getattr(message, "content", message)
-    if isinstance(content, list):
-        return "".join(b.get("text", "") for b in content if isinstance(b, dict))
-    return content or ""
-
-
-def tool_output_text(result) -> str:
-    """MCP 도구 호출 결과(str, content 블록 리스트, ToolMessage)를 문자열로 정규화"""
-    if hasattr(result, "content"):
-        result = result.content
-    if isinstance(result, list):
-        return "".join(b.get("text", "") if isinstance(b, dict) else str(b) for b in result)
-    return str(result)
 
 
 @asynccontextmanager

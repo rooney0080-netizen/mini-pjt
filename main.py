@@ -14,8 +14,8 @@ import shutil
 import sys
 import time
 
-from src.config import DEFAULT_DB, DEFAULT_HISTORY, INIT_DB, LOG_DIR
-from src.graph import make_tracer, run_request
+from src.shared.config import DEFAULT_DB, DEFAULT_HISTORY, INIT_DB, LOG_DIR
+from src.workflows.sr_graph import make_tracer, run_request
 
 
 def ask_approval(card: str) -> str:

@@ -1,4 +1,4 @@
-"""pii.py - 전화번호·이메일 PII 탐지·마스킹 (출력 가드, 로그 미들웨어, tracer 공용)"""
+"""shared/pii.py - 전화번호·이메일 PII 탐지·마스킹 (출력 가드, 로그 미들웨어, tracer 공용)"""
 import re
 
 PHONE_RE = re.compile(r"(01[016789])-?(\d{3,4})-?(\d{4})")

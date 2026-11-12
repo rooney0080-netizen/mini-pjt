@@ -64,13 +64,16 @@ SR 요청
 
 | 파일 | 역할 |
 |---|---|
-| [src/graph.py](src/graph.py) | 바깥 StateGraph, HITL, 실행·리포트 |
-| [src/agents.py](src/agents.py) | Supervisor + analyst/sql/reviewer, 제출 도구 |
-| [src/guards.py](src/guards.py) | 입력 가드, sqlglot 정적검사, 출력 가드 |
-| [src/mcp_readonly.py](src/mcp_readonly.py), [src/mcp_exec.py](src/mcp_exec.py) | MCP 서버 2개 |
-| [src/middleware.py](src/middleware.py) | 재시도, 도구 결과 PII 마스킹·데이터 표식 |
-| [src/tracer.py](src/tracer.py) | JSONL trace (v2는 마스킹) |
-| [src/v1_agent.py](src/v1_agent.py) | v1 기준선 |
+| [src/workflows/](src/workflows/) | 바깥 StateGraph(노드 연결·HITL), 그래프 상태 타입 |
+| [src/intake/](src/intake/) | 입력 가드, Planner(프롬프트·구조화 출력 스키마) |
+| [src/policy/](src/policy/) | 화이트리스트·한도, 정책 사전검사, sqlglot 정적검사 |
+| [src/drafting/](src/drafting/) | Supervisor + analyst/sql/reviewer, 프롬프트, 제출 도구 |
+| [src/execution/](src/execution/) | 롤백 SQL 생성·dry-run 검증, 승인 후 실행·사후 검증 |
+| [src/history/](src/history/) | 변경 이력 Store, 중복 경고 |
+| [src/reporting/](src/reporting/) | 승인 카드·리포트 템플릿, 출력 가드 |
+| [src/tools/](src/tools/) | MCP 서버 2개(ops-readonly / ops-exec)와 클라이언트 |
+| [src/shared/](src/shared/) | LLM 클라이언트, 재시도·PII 마스킹 미들웨어, JSONL trace, DB·PII 유틸 |
+| [src/baseline/](src/baseline/) | v1 기준선 |
 | [eval/run_eval.py](eval/run_eval.py), [eval/llm_judge.py](eval/llm_judge.py) | 평가 러너, LLM-Judge |
 
 ### 적용 패턴
@@ -154,8 +157,8 @@ SR 요청
 
 ### 6.1 비교 조건
 
-- **v1 (기준선)** [src/v1_agent.py](src/v1_agent.py): 단일 ReAct(`create_agent`). 시스템 프롬프트에는 v2와 **같은 규칙 전부**(승인 후 실행, UPDATE만, WHERE 필수, 화이트리스트, 허용 코드값, 10건 한도, 대상 없음, 모호 대상, PII 마스킹, 데이터 속 지시 무시, 롤백 SQL 작성)를 썼다. 다만 코드로 강제하지 않고, LLM이 실행 툴(`execute_sql`)을 직접 가진다. 이력 Store는 없다.
-- **v2** [src/graph.py](src/graph.py): §2 아키텍처 전체
+- **v1 (기준선)** [src/baseline/agent.py](src/baseline/agent.py): 단일 ReAct(`create_agent`). 시스템 프롬프트에는 v2와 **같은 규칙 전부**(승인 후 실행, UPDATE만, WHERE 필수, 화이트리스트, 허용 코드값, 10건 한도, 대상 없음, 모호 대상, PII 마스킹, 데이터 속 지시 무시, 롤백 SQL 작성)를 썼다. 다만 코드로 강제하지 않고, LLM이 실행 툴(`execute_sql`)을 직접 가진다. 이력 Store는 없다.
+- **v2** [src/workflows/sr_graph.py](src/workflows/sr_graph.py): §2 아키텍처 전체
 - **같은 조건**: 같은 인-아웃 세트, 같은 초기 DB(해시 고정), 같은 모델(Claude Sonnet 4.5, temperature 0), 같은 Judge, 같은 운영자 시뮬레이션. 각 1회 실행
 - 결과 원본: [eval/results_v1.json](eval/results_v1.json), [eval/results_v2.json](eval/results_v2.json)
 

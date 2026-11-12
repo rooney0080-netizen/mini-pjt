@@ -1,4 +1,4 @@
-"""mcp_exec.py - 운영 DB 변경 MCP 서버 (ops-exec)
+"""tools/ops_exec_server.py - 운영 DB 변경 MCP 서버 (ops-exec)
 
 노출 도구
   - execute_sql(sql)                         [v1 기준선 전용] SQL 1문장 실행 후 커밋
@@ -12,11 +12,11 @@ import sqlite3
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from fastmcp import FastMCP  # noqa: E402
 
-from src.db import connect_rw, data_hash_conn, db_path_from_env  # noqa: E402
-from src.guards import check_sql  # noqa: E402
+from src.shared.db import connect_rw, data_hash_conn, db_path_from_env  # noqa: E402
+from src.policy.sql_guard import check_sql  # noqa: E402
 
 mcp = FastMCP("ops-exec")
 
