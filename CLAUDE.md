@@ -94,6 +94,23 @@ AI 에이전트 개발 교육(Day1~7) 미니프로젝트 과제. 이 파일은 �
 - **v1(기준선)**: 프롬프트 규칙만 있는 단일 ReAct(create_agent), 실행 툴을 LLM이 직접 보유. 코드 강제 없음 → `results_v1.json`
 - **v2**: 위 아키텍처 전체 → `results_v2.json`. SERVICE.md에 비교표와 실패 사례를 솔직하게 기록
 
+### 7.1 버전 공통 인터페이스 (평가 러너가 의존 — v2도 반드시 지킬 것)
+
+`eval/run_eval.py`가 `src.v1_agent` / `src.graph` 모듈에서 아래 두 함수를 가져다 쓴다.
+
+```python
+def make_tracer(path) -> FileTracer          # v1: mask=False, v2: mask=True
+async def run_request(request, *, db_path, history_path, approval_fn, callbacks) -> dict
+    # approval_fn(card_text) -> "approve" | "reject" | None   (승인 카드 텍스트를 넘기면 케이스 정의대로 응답)
+    # callbacks: [ToolRecorder, FileTracer] — 하위 Agent·노드의 도구 호출까지 전달되도록 config로 넘길 것
+    # 반환: {"output": 사용자에게 보인 전체 텍스트(승인 카드 포함), "rollback_sql": 실행 가능한 롤백 SQL 문자열 | None}
+```
+
+- 실행 도구 이름은 `execute_sql`(v1) / `execute_change`(v2) — 러너가 이 이름으로 실행 호출 수를 센다
+- 이력 Store: `SqliteStore` at `history_path`, namespace `("sr_history", table, pk)`, key `f"{column}@{iso}"`, value `{column, old, new, reason, at}` (F10 시드도 같은 형식)
+- 케이스 산출물: `eval/runs/<version>/<case>/{ops.db, history.sqlite, trace.jsonl}` (gitignore)
+- MCP 세션은 `src/runtime.py: mcp_tools(db_path)`로 연다 (`get_tools()`는 호출마다 프로세스를 띄워 느림)
+
 ## 8. 기술 스택 / 환경
 
 - Python 3.14, 버전은 `requirements.txt`에 고정 (교육 실습 `.venv`에서 검증된 버전)
