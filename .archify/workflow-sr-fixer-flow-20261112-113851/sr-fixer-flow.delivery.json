@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "357cf1c3-ce05-4b0b-8af6-c95988c3044b",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "C:\\Users\\Admin\\Desktop\\mini-prj\\.archify\\workflow-sr-fixer-flow-20261112-113851\\candidate.json",
+  "output": "C:\\Users\\Admin\\Desktop\\mini-prj\\.archify\\workflow-sr-fixer-flow-20261112-113851\\sr-fixer-flow.html",
+  "specification": {
+    "sha256": "a8631dc29abfc12a452576797a16a2f422b48e8d5e438ccdc54f6662e46a23c3",
+    "bytes": 7825
+  },
+  "artifact": {
+    "sha256": "0450dd963cb18a34d36a3a0a83f22377a0ad9c65f62ad00df298144ad16f243d",
+    "bytes": 867314
+  }
+}

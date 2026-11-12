@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "workflow",
+  "quality": "showcase",
+  "specification": {
+    "path": "C:\\Users\\Admin\\Desktop\\mini-prj\\.archify\\workflow-sr-fixer-flow-20261112-113851\\candidate.json",
+    "sha256": "a8631dc29abfc12a452576797a16a2f422b48e8d5e438ccdc54f6662e46a23c3",
+    "bytes": 7825
+  },
+  "artifact": {
+    "path": "C:\\Users\\Admin\\Desktop\\mini-prj\\.archify\\workflow-sr-fixer-flow-20261112-113851\\sr-fixer-flow.html",
+    "sha256": "0450dd963cb18a34d36a3a0a83f22377a0ad9c65f62ad00df298144ad16f243d",
+    "bytes": 867314
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "C:\\Users\\Admin\\Desktop\\mini-prj\\.archify\\workflow-sr-fixer-flow-20261112-113851\\sr-fixer-flow.finalize.json",
+    "summaryReceipt": "C:\\Users\\Admin\\Desktop\\mini-prj\\.archify\\workflow-sr-fixer-flow-20261112-113851\\sr-fixer-flow.finalize-summary.json",
+    "browserCheckReceipt": "C:\\Users\\Admin\\Desktop\\mini-prj\\.archify\\workflow-sr-fixer-flow-20261112-113851\\sr-fixer-flow.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-12T02:41:08.960Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 4871,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}

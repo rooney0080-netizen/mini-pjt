@@ -1,0 +1,350 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "SR-Fixer v2 처리 흐름",
+    "locale": "ko",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-sr-fixer-flow-20261112-113851/sr-fixer-flow.html"
+  },
+  "lanes": [
+    {
+      "id": "ops",
+      "label": "운영자 (요청·승인·리포트)"
+    },
+    {
+      "id": "code",
+      "label": "코드 강제 (그래프 노드)"
+    },
+    {
+      "id": "agent",
+      "label": "LLM 에이전트"
+    },
+    {
+      "id": "data",
+      "label": "MCP 서버 · 이력 Store"
+    }
+  ],
+  "phases": [
+    {
+      "id": "intake",
+      "label": "접수 · 계획",
+      "fromCol": 0,
+      "toCol": 0
+    },
+    {
+      "id": "analysis",
+      "label": "대상 분석 · SQL 작성",
+      "fromCol": 1,
+      "toCol": 2,
+      "variant": "emphasis"
+    },
+    {
+      "id": "commit",
+      "label": "검증 · 승인 · 실행",
+      "fromCol": 3,
+      "toCol": 5,
+      "variant": "security"
+    }
+  ],
+  "groups": [
+    {
+      "id": "supervisor",
+      "label": "Supervisor (하위 변경마다)",
+      "lane": "agent",
+      "fromCol": 1,
+      "toCol": 3,
+      "variant": "emphasis"
+    }
+  ],
+  "mainPath": [
+    "inputGuard",
+    "planner",
+    "precheck",
+    "analyst",
+    "sqlAgent",
+    "reviewer",
+    "gate",
+    "approval",
+    "execute",
+    "report"
+  ],
+  "nodes": [
+    {
+      "id": "blockedGuard",
+      "lane": "ops",
+      "col": 0,
+      "type": "security",
+      "icon": "stop",
+      "label": "차단 리포트",
+      "sublabel": "입력·정책 위반, 변경 0건"
+    },
+    {
+      "id": "blockedRun",
+      "lane": "ops",
+      "col": 2,
+      "type": "security",
+      "icon": "stop",
+      "label": "미실행 리포트",
+      "sublabel": "대상·검증 실패·거절, 변경 0건"
+    },
+    {
+      "id": "approval",
+      "lane": "ops",
+      "col": 3,
+      "type": "security",
+      "icon": "decision",
+      "label": "승인 카드 (HITL)",
+      "sublabel": "interrupt(): diff·건수·롤백 SQL",
+      "tag": "승인 / 거절"
+    },
+    {
+      "id": "report",
+      "lane": "ops",
+      "col": 5,
+      "type": "frontend",
+      "icon": "success",
+      "label": "실행 리포트",
+      "sublabel": "사후 검증·롤백 SQL·PII 마스킹"
+    },
+    {
+      "id": "inputGuard",
+      "lane": "code",
+      "col": 0,
+      "type": "security",
+      "label": "SR 요청 → 입력 가드",
+      "sublabel": "SQL 조각·지시 무시·승인 우회 차단"
+    },
+    {
+      "id": "precheck",
+      "lane": "code",
+      "col": 1,
+      "type": "security",
+      "label": "정책 precheck",
+      "sublabel": "UPDATE만·화이트리스트·코드값"
+    },
+    {
+      "id": "gate",
+      "lane": "code",
+      "col": 3,
+      "type": "security",
+      "label": "코드 게이트 + dry-run",
+      "sublabel": "정적검사·실측 행/컬럼·롤백 복원"
+    },
+    {
+      "id": "execute",
+      "lane": "code",
+      "col": 4,
+      "type": "backend",
+      "label": "실행 + 사후 검증",
+      "sublabel": "건수 불일치 시 ROLLBACK"
+    },
+    {
+      "id": "planner",
+      "lane": "agent",
+      "col": 0,
+      "type": "backend",
+      "label": "Planner",
+      "sublabel": "LCEL+Pydantic: SR → 하위 변경"
+    },
+    {
+      "id": "analyst",
+      "lane": "agent",
+      "col": 1,
+      "type": "backend",
+      "label": "analyst_agent",
+      "sublabel": "ReAct 대상 조회 → submit_targets"
+    },
+    {
+      "id": "sqlAgent",
+      "lane": "agent",
+      "col": 2,
+      "type": "backend",
+      "label": "sql_agent",
+      "sublabel": "UPDATE 작성 → submit_sql"
+    },
+    {
+      "id": "reviewer",
+      "lane": "agent",
+      "col": 3,
+      "type": "backend",
+      "label": "reviewer_agent",
+      "sublabel": "의도 일치 검토 → submit_review"
+    },
+    {
+      "id": "readonly",
+      "lane": "data",
+      "col": 1,
+      "type": "database",
+      "label": "ops-readonly MCP",
+      "sublabel": "SQLite mode=ro 조회"
+    },
+    {
+      "id": "execMcp",
+      "lane": "data",
+      "col": 4,
+      "type": "database",
+      "label": "ops-exec MCP",
+      "sublabel": "dry_run · execute_change"
+    },
+    {
+      "id": "store",
+      "lane": "data",
+      "col": 5,
+      "type": "database",
+      "label": "이력 Store",
+      "sublabel": "SqliteStore: 사유·변경 전후"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-plan",
+      "from": "inputGuard",
+      "to": "planner",
+      "label": "통과",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-precheck",
+      "from": "planner",
+      "to": "precheck",
+      "label": "하위 변경마다"
+    },
+    {
+      "id": "e-analyst",
+      "from": "precheck",
+      "to": "analyst",
+      "label": "통과",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-sql",
+      "from": "analyst",
+      "to": "sqlAgent",
+      "label": "검증된 대상"
+    },
+    {
+      "id": "e-review",
+      "from": "sqlAgent",
+      "to": "reviewer",
+      "label": "정적검사 통과 SQL"
+    },
+    {
+      "id": "e-gate",
+      "from": "reviewer",
+      "to": "gate",
+      "label": "검토 결과"
+    },
+    {
+      "id": "e-approval",
+      "from": "gate",
+      "to": "approval",
+      "label": "dry-run 통과",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-execute",
+      "from": "approval",
+      "to": "execute",
+      "label": "승인",
+      "variant": "security"
+    },
+    {
+      "id": "e-report",
+      "from": "execute",
+      "to": "report",
+      "label": "커밋"
+    },
+    {
+      "id": "e-rework",
+      "from": "reviewer",
+      "to": "sqlAgent",
+      "label": "반려 시 재작성",
+      "variant": "dashed",
+      "role": "return"
+    },
+    {
+      "id": "e-query",
+      "from": "analyst",
+      "to": "readonly",
+      "label": "조회",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "e-dryrun",
+      "from": "gate",
+      "to": "execMcp",
+      "label": "dry_run",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "e-commit",
+      "from": "execute",
+      "to": "execMcp",
+      "label": "execute_change",
+      "role": "branch"
+    },
+    {
+      "id": "e-history",
+      "from": "execute",
+      "to": "store",
+      "label": "이력 저장",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "x-guard",
+      "from": "inputGuard",
+      "to": "blockedGuard",
+      "label": "차단",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "x-policy",
+      "from": "precheck",
+      "to": "blockedGuard",
+      "label": "정책 위반",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "x-gate",
+      "from": "gate",
+      "to": "blockedRun",
+      "label": "대상 없음·한도 초과·검증 실패",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "x-reject",
+      "from": "approval",
+      "to": "blockedRun",
+      "label": "거절",
+      "variant": "security",
+      "role": "error"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "안전장치 원칙",
+      "items": [
+        "ops-exec MCP는 어떤 LLM에도 바인딩하지 않고 그래프 노드만 호출",
+        "하위 Agent 결과는 제출 도구로만 받고 코드가 즉시 재검증",
+        "하위 변경 하나라도 막히면 SR 전체 미실행 (all-or-nothing)"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "흐름 보충",
+      "items": [
+        "대상 없음·모호·한도 초과면 Supervisor가 조기 종료하고 코드 게이트가 판정",
+        "dry-run 후 이력 Store를 조회해 승인 카드에 중복 변경 경고",
+        "도구 결과는 미들웨어가 PII 마스킹한 뒤 LLM에 전달"
+      ]
+    }
+  ]
+}
