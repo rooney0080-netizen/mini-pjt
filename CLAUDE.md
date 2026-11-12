@@ -172,6 +172,13 @@ mini-prj/
 - [x] `data/make_db.py` — 샘플 DB (schema_hash=170b9de38ef7fc15, data_hash=6834ab10c7f3edb1, 3월 미정산 48건)
 - [x] `eval/inout_set.json` — 케이스 19개 + 전역 검사 G08 (기대 diff를 초기 DB와 대조 완료)
 - [x] `SERVICE.md` 골격 (§6 결과·실패 분석은 TODO)
-- [ ] P1: MCP 서버 2개 + v1 + run_eval → `results_v1.json`
-- [ ] P2: v2 구현
-- [ ] P3: `results_v2.json` + LLM-Judge + SERVICE.md 비교·실패 분석
+- [x] P1: MCP 서버 2개 + v1 + run_eval → `results_v1.json` (15/20)
+- [x] P2: v2 구현 (`src/graph.py`, `agents.py`, `guards.py`, `middleware.py`, `schemas.py`) + `main.py`
+- [x] P3: `results_v2.json` (20/20, Judge 5.0) + ablation + SERVICE.md §6 비교·실패 분석
+- [ ] `main.py` CLI 실제 실행 확인 — 2026-11-12 Bedrock **일일 토큰 한도 소진**으로 미확인. 한도 복구 후 `--reset`으로 F01 요청 1건 시연 확인 필요
+- [ ] (선택) ablation G03·G09 재실행 — 실행 B가 토큰 한도 오류로 미완
+
+### 진행 중 알게 된 것
+- 평가 1회 전체 실행 ≈ v1 32만 / v2 37만 토큰. 하루에 여러 번 돌리면 Bedrock 일일 토큰 한도에 걸린다
+- Planner·Supervisor LLM은 미들웨어가 안 붙으므로 재시도는 `make_llm()`의 botocore adaptive retry가 담당
+- v1 승인 응답은 "변경 제안(SQL 블록)마다 최대 3회" 규칙 (v1 사전 실행 후 보완, SERVICE.md §6.6에 기록)

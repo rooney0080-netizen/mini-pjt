@@ -29,5 +29,10 @@ HISTORY_NS = "sr_history"
 
 
 def make_llm():
+    """모든 LLM 호출(Planner, Supervisor, 하위 Agent, Judge) 공용.
+    botocore 적응형 재시도로 Bedrock ThrottlingException을 클라이언트 단에서 흡수한다
+    (ModelRetryMiddleware는 create_agent 기반 하위 Agent에만 붙기 때문에 Planner·Supervisor는 이것으로 보호)."""
+    from botocore.config import Config
     from langchain_aws import ChatBedrockConverse
-    return ChatBedrockConverse(model=MODEL_ID, region_name=REGION, temperature=0)
+    return ChatBedrockConverse(model=MODEL_ID, region_name=REGION, temperature=0,
+                               config=Config(retries={"max_attempts": 10, "mode": "adaptive"}))

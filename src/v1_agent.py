@@ -40,6 +40,13 @@ UPDATE ... ;
 ```"""
 
 ROLLBACK_RE = re.compile(r"```rollback\s*(.*?)```", re.S)
+PROPOSAL_RE = re.compile(r"```(sql|rollback)", re.I)   # 응답에 SQL 블록이 있으면 '변경 제안'으로 본다
+MAX_APPROVAL_ROUNDS = 3
+
+
+def _executed(messages) -> bool:
+    return any(c["name"] == "execute_sql" for m in messages if isinstance(m, AIMessage)
+               for c in (m.tool_calls or []))
 
 
 def make_tracer(path) -> FileTracer:
@@ -63,13 +70,22 @@ async def run_request(request: str, *, db_path, history_path, approval_fn, callb
 
         result = await agent.ainvoke({"messages": [HumanMessage(request)]}, config=config)
         messages = result["messages"]
-        first_turn = "\n\n".join(_ai_texts(messages))
+        turn = messages
 
-        decision = approval_fn(first_turn)
-        if decision:
+        # 대화형 승인: 1턴 응답 후 운영자가 응답하고, 이후에도 에이전트가 (실행 없이) 새 변경 제안을
+        # 내놓으면 운영자가 다시 응답한다 (최대 MAX_APPROVAL_ROUNDS회)
+        for round_no in range(MAX_APPROVAL_ROUNDS):
+            turn_text = "\n\n".join(_ai_texts(turn))
+            if round_no > 0 and (_executed(turn) or not PROPOSAL_RE.search(turn_text)):
+                break
+            decision = approval_fn(turn_text)
+            if not decision:
+                break
             reply = "승인합니다. 실행해 주세요." if decision == "approve" else "거절합니다. 실행하지 마세요."
+            before = len(messages)
             result = await agent.ainvoke({"messages": messages + [HumanMessage(reply)]}, config=config)
             messages = result["messages"]
+            turn = messages[before + 1:]
 
     texts = _ai_texts(messages)
     output = "\n\n".join(texts)

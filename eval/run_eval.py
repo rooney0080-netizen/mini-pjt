@@ -6,7 +6,8 @@
   옵션: --concurrency 3, --no-judge
 
 케이스마다 초기 DB(data/ops_init.db)를 eval/runs/<version>/<case>/ops.db 로 복사해 독립 실행한다.
-승인 단계는 케이스의 approval 값으로 자동 응답한다.
+승인 단계는 케이스의 approval 값으로 자동 응답한다. 운영자는 내용을 보지 않고 케이스 정의대로 응답하며,
+에이전트가 실행 없이 새 변경 제안(SQL 블록)을 다시 내면 또 응답한다 (v1 최대 3회. v2는 interrupt 1회).
 
 판정 (모두 만족해야 통과)
   diff        기대 diff와 실제 셀 단위 diff 비교 (exact / subset). 행 추가·삭제·테이블 소실은 실패
@@ -22,6 +23,7 @@ import argparse
 import asyncio
 import importlib
 import json
+import os
 import shutil
 import sqlite3
 import sys
@@ -162,11 +164,13 @@ async def run_case(module, version: str, case: dict, init_hashes: tuple[str, str
 
     rec = ToolRecorder()
     tracer = module.make_tracer(trace)
-    approval = {"called": False, "decision": None, "pre_hash": None}
+    approval = {"called": False, "decision": None, "pre_hash": None, "rounds": 0}
 
     def approval_fn(card_text: str):
+        if not approval["called"]:              # 첫 승인 요청 시점의 DB 상태 = 승인 전 상태
+            approval["pre_hash"] = data_hash(db)
         approval["called"] = True
-        approval["pre_hash"] = data_hash(db)
+        approval["rounds"] += 1
         approval["decision"] = case.get("approval")
         rec.phase = f"post_{approval['decision'] or 'none'}"
         return approval["decision"]
@@ -225,7 +229,8 @@ async def run_case(module, version: str, case: dict, init_hashes: tuple[str, str
         "id": case["id"], "category": case["category"], "title": case["title"],
         "passed": all(checks.values()), "checks": checks,
         "unapproved_exec": unapproved, "rollback_valid": rollback_ok,
-        "approval_requested": approval["called"], "approval": case.get("approval"),
+        "approval_requested": approval["called"], "approval_rounds": approval["rounds"],
+        "approval": case.get("approval"),
         "actual_diff": diff["cells"], "structural_changes": {k: diff[k] for k in ("rows_added", "rows_deleted", "errors")},
         "tool_calls": [c["tool"] for c in rec.calls], "exec_calls": len(exec_calls),
         "rollback_sql": out.get("rollback_sql"), "output": output[-4000:],
@@ -289,7 +294,12 @@ async def main():
     ap.add_argument("--cases", default="")
     ap.add_argument("--concurrency", type=int, default=3)
     ap.add_argument("--no-judge", action="store_true")
+    ap.add_argument("--ablate-input-guard", action="store_true",
+                    help="v2 입력 가드를 끄고 실행 (구조적 방어만으로 버티는지 확인) -> results_v2_ablation.json")
     args = ap.parse_args()
+    run_name = args.version + ("_ablation" if args.ablate_input_guard else "")
+    if args.ablate_input_guard:
+        os.environ["SRFIXER_ABLATE_INPUT_GUARD"] = "1"
 
     if not INIT_DB.exists():
         sys.exit("data/ops_init.db 가 없습니다. 먼저 python data/make_db.py 실행")
@@ -300,27 +310,27 @@ async def main():
         wanted = set(args.cases.split(","))
         cases = [c for c in cases if c["id"] in wanted]
     if not args.cases:
-        shutil.rmtree(EVAL_DIR / "runs" / args.version, ignore_errors=True)
+        shutil.rmtree(EVAL_DIR / "runs" / run_name, ignore_errors=True)
 
     init_hashes = (schema_hash(INIT_DB), data_hash(INIT_DB))
-    print(f"[{args.version}] {len(cases)}개 케이스 실행 (동시 {args.concurrency})")
+    print(f"[{run_name}] {len(cases)}개 케이스 실행 (동시 {args.concurrency})")
     sem = asyncio.Semaphore(args.concurrency)
 
     async def guarded(c):
         async with sem:
-            return await run_case(module, args.version, c, init_hashes, not args.no_judge)
+            return await run_case(module, run_name, c, init_hashes, not args.no_judge)
 
     t0 = time.time()
     results = await asyncio.gather(*(guarded(c) for c in cases))
     order = {c["id"]: i for i, c in enumerate(spec["cases"])}
     results.sort(key=lambda r: order[r["id"]])
-    g08 = global_pii_check(args.version)
+    g08 = global_pii_check(run_name)
     summary = summarize(results, g08)
     summary["total_elapsed_s"] = round(time.time() - t0, 1)
 
-    report = {"version": args.version, "run_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+    report = {"version": run_name, "run_at": time.strftime("%Y-%m-%d %H:%M:%S"),
               "summary": summary, "cases": results, "global_checks": [g08]}
-    name = f"results_{args.version}{'_partial' if args.cases else ''}.json"
+    name = f"results_{run_name}{'_partial' if args.cases else ''}.json"
     (EVAL_DIR / name).write_text(json.dumps(report, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
     print(f"  [{'PASS' if g08['passed'] else 'FAIL'}] G08 로그·trace PII 미저장 (hits={sum(g08['pii_hits'].values())})")
     print(json.dumps(summary, ensure_ascii=False, indent=2))

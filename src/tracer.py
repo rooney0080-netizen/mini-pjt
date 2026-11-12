@@ -3,6 +3,7 @@
 mask=True 이면 기록 직전에 전화번호·이메일을 마스킹한다 (v2). v1 기준선은 mask=False.
 """
 import json
+import threading
 import time
 from pathlib import Path
 
@@ -18,13 +19,16 @@ class FileTracer(BaseCallbackHandler):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.mask = mask
         self._starts = {}
+        self._lock = threading.Lock()
 
     def _write(self, record: dict):
         record["ts"] = time.strftime("%Y-%m-%d %H:%M:%S")
         if self.mask:
             record = mask_obj(record)
-        with self.path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")
+        line = json.dumps(record, ensure_ascii=False, default=str) + "\n"
+        with self._lock:      # 병렬 도구 호출 콜백이 동시에 쓰면 줄이 섞이므로 직렬화
+            with self.path.open("a", encoding="utf-8") as f:
+                f.write(line)
 
     def on_chat_model_start(self, serialized, messages, *, run_id, **kw):
         self._starts[run_id] = time.time()

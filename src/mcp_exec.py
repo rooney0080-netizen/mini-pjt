@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from fastmcp import FastMCP  # noqa: E402
 
 from src.db import connect_rw, data_hash_conn, db_path_from_env  # noqa: E402
+from src.guards import check_sql  # noqa: E402
 
 mcp = FastMCP("ops-exec")
 
@@ -42,27 +43,46 @@ def execute_sql(sql: str) -> str:
         conn.close()
 
 
-@mcp.tool()
-def dry_run(sql: str, rollback_statements: list[str]) -> str:
-    """UPDATE를 트랜잭션 안에서 실행해 영향 건수를 재고, 롤백 SQL로 원상복구되는지 검증한 뒤 ROLLBACK 한다.
+def _table_rows(conn, table: str) -> dict:
+    info = list(conn.execute(f"PRAGMA table_info({table})"))
+    cols = [r[1] for r in info]
+    pk_idx = next((i for i, r in enumerate(info) if r[5]), 0)
+    return cols, {row[pk_idx]: row for row in conn.execute(f"SELECT * FROM {table}")}
 
-    DB는 절대 변경되지 않는다.
+
+@mcp.tool()
+def dry_run(sql: str, rollback_statements: list[str], table: str) -> str:
+    """UPDATE를 트랜잭션 안에서 실행해 실제로 바뀐 행·컬럼을 측정하고, 롤백 SQL로 원상복구되는지 검증한 뒤 ROLLBACK 한다.
+
+    DB는 절대 변경되지 않는다 (마지막에 항상 ROLLBACK).
 
     Args:
         sql: 검증할 UPDATE 문 1개
         rollback_statements: 원상복구용 SQL 문 목록
+        table: UPDATE 대상 테이블 (변경 행 비교용)
     """
+    violations = check_sql(sql)
+    if violations:
+        return json.dumps({"error": "정적검사 위반", "violations": violations}, ensure_ascii=False)
     conn = connect_rw(db_path_from_env())
     try:
         conn.execute("BEGIN")
-        before = data_hash_conn(conn)
+        before_hash = data_hash_conn(conn)
+        cols, before = _table_rows(conn, table)
         n = conn.execute(sql).rowcount
-        changed = data_hash_conn(conn) != before
+        _, after = _table_rows(conn, table)
+        changed_pks, changed_cols = [], set()
+        for pk, row in before.items():
+            if after.get(pk) != row:
+                changed_pks.append(pk)
+                changed_cols |= {c for c, a, b in zip(cols, row, after.get(pk) or [None] * len(cols)) if a != b}
         for stmt in rollback_statements:
             conn.execute(stmt)
-        restores = data_hash_conn(conn) == before
+        restores = data_hash_conn(conn) == before_hash
         conn.execute("ROLLBACK")
-        return json.dumps({"rowcount": n, "data_changed": changed,
+        return json.dumps({"rowcount": n, "changed_pks": sorted(changed_pks),
+                           "changed_columns": sorted(changed_cols),
+                           "rows_added_or_deleted": set(after) != set(before),
                            "rollback_restores": restores}, ensure_ascii=False)
     except sqlite3.Error as e:
         if conn.in_transaction:
@@ -80,6 +100,9 @@ def execute_change(sql: str, expected_rowcount: int) -> str:
         sql: 승인된 UPDATE 문 1개
         expected_rowcount: 승인 시 제시한 영향 건수
     """
+    violations = check_sql(sql)       # 이중 방어: 그래프에서 검사했더라도 실행 직전에 다시 검사
+    if violations:
+        return json.dumps({"status": "refused", "reason": violations}, ensure_ascii=False)
     conn = connect_rw(db_path_from_env())
     try:
         conn.execute("BEGIN")
